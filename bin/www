@@ -1,0 +1,20 @@
+#!/usr/bin/env node
+/**
+ * Created by liam on 23/11/16.
+ */
+
+var http = require('http');
+
+var app = require('../app');
+
+var server = http.createServer(app);
+
+server.on('start', function() {
+    console.log("Server started successfully.")
+});
+
+server.on('error', function(error) {
+    console.error("Server could not bind to port.\n", error)
+});
+
+server.listen(5000);
