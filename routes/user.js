@@ -21,7 +21,7 @@ router.get('/', permission(2), function(req, res) {
 router.post('/', permission(0), jsonParser, function(req, res) {
     var new_secret = uuid.v4();
     console.log(new_secret);
-    var exam_id = req.params.exam_id;
+    var exam_id = req.exam_id;
     var name_noun = req.body.name_noun;
     var name_color = req.body.name_color;
 

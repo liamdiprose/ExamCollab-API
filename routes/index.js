@@ -6,9 +6,10 @@ var express = require('express');
 var router = express.Router({mergeParams: true});
 
 // Database models
+var loadUser = require('../middlewares/loadUser');
 
-
-// router.all('*', loadUser);
+// Load in admin access
+router.use(loadUser);
 // router.all('*', connection_limiting);
 
 

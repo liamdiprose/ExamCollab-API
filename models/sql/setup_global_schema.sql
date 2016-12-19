@@ -61,7 +61,7 @@ BEGIN
 
   CREATE SEQUENCE seq_id_questions;
   CREATE TABLE questions (
-    ID SERIAL PRIMARY KEY ,
+    id SERIAL PRIMARY KEY ,
     number INTEGER,
     body_text VARCHAR,
     author BIGINT REFERENCES users(id),
@@ -73,21 +73,26 @@ BEGIN
   );
 
   CREATE TABLE answers (
-    ID SERIAL PRIMARY KEY,
+    id SERIAL PRIMARY KEY,
     body_text VARCHAR NOT NULL,
     author BIGINT REFERENCES users(id) NOT NULL,
     created TIMESTAMP DEFAULT now(),
-    parent_question BIGINT REFERENCES questions(id) NOT NULL,
-    votes_up INTEGER DEFAULT 0,
-    votes_down INTEGER DEFAULT 0,
+    parent_question BIGINT REFERENCES questions(id) NOT NULL
     superceded_by BIGINT REFERENCES answers(ID) DEFAULT NULL,
     superceded_comment VARCHAR DEFAULT NULL,
     CONSTRAINT positive_votes CHECK (
       votes_up >= 0 and votes_down >= 0)
   );
 
+   CREATE TABLE answer_votes (
+      user_id BIGINT REFERENCES users(id) NOT NULL,
+      answer BIGINT REFERENCES answers(id) NOT NULL,
+      PRIMARY KEY (user, answer),
+      is_upvote BOOLEAN NOT NULL
+   );
+
   CREATE TABLE comments (
-    ID SERIAL PRIMARY KEY ,
+    id SERIAL PRIMARY KEY ,
     body_text VARCHAR NOT NULL,
     author BIGINT REFERENCES users(id) NOT NULL,
     created TIMESTAMP DEFAULT now(),
@@ -96,6 +101,13 @@ BEGIN
     CONSTRAINT question_or_answer CHECK (
       (parent_answer is not NULL and parent_question is NULL) or
       (parent_question is not NULL and parent_answer is NULL))
+  );
+
+  CREATE TABLE comments_votes (
+    user BIGINT REFERENCES users(id) NOT NULL,
+    comment BIGINT REFERENCES comments(id) NOT NULL,
+    PRIMARY KEY (user, answer),
+    is_upvote BOOLEAN NOT NULL
   );
 
   CREATE TABLE bans (
@@ -135,6 +147,23 @@ BEGIN
   RETURN OLD;
 END;
 $$ LANGUAGE plpgsql;
+
+-- Up/Down-Voting
+CREATE OR REPLACE FUNCTION vote_answer(exam_num bigint, user_id bigint, answer_id bigint, is_upvote BOOLEAN)
+RETURNS VOID AS $$
+DECLARE
+BEGIN
+    my_schema := 'exam_' || exam_num;
+    SET SEARCH_PATH TO my_schema;
+
+    INSERT INTO answer_votes VALUES
+    (user_id, answer_id, is_upvote)
+    ON CONFLICT DO UPDATE
+    SET is_upvote=is_upvote
+    WHERE (user_id=user_id AND answer_id=answer_id);
+
+    SET SEARCH_PATH TO public;
+END;
 
 -- Create Exams Directory
 CREATE SEQUENCE exams_seq_id;
@@ -178,6 +207,6 @@ CREATE TABLE ip_connections (
 CREATE TABLE users (
     id SERIAL PRIMARY KEY,
     permission_level INTEGER CHECK
-    (permission_level >= 0 AND permission_level <=3),
+    (permission_level >= 0 AND permission_level <=4),
     secret_token UUID
 );

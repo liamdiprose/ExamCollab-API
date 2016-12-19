@@ -1,6 +1,6 @@
 #!/bin/bash
 
-permission_level=3  # admin
+permission_level=4 # admin
 
 myuuid=$(uuidgen)
 

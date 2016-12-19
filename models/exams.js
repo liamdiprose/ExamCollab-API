@@ -7,6 +7,10 @@ var database = require('./database');
 var db = database.db;
 var sql = database.sql;
 
+exports.checkExists = function(exam_id) {
+    return db.one("SELECT EXISTS(SELECT 1 FROM public.exams WHERE id=${exam_id})", {exam_id: exam_id});
+};
+
 exports.getAllExams = function() {
     return db.any("SELECT * FROM public.exams");
 };

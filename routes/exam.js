@@ -11,32 +11,42 @@ var answerModel = require('../models/answers');
 var commentModel = require('../models/comments');
 var questionModel = require('../models/questions');
 
+var roles = userModel.roles;
 
 // Authenticate users if they access an exam with a token
 router.param('exam_id', function (req, res, next, exam_id) {
-    console.log("Parameter function for exam_id");
-    req.exam_id = exam_id;
-    // Load in user if token supplied in query string
-    console.log("Exam ID: " + exam_id + " User token: " + req.query.token);
-
-    userModel.getUserByToken(req.exam_id, req.query.token)
-        .then(function (result) {
-            if (result) {
-                req.user = result.user;
-                req.permission_level = result.permission_level;
+    examModel.checkExists(exam_id)
+        .then(function(result) {
+            if (result.exists) {
+                req.exam_id = exam_id;
+                // Load in user if token supplied in query string
+                if (!req.authenticated) {
+                    console.log("Exam ID: " + exam_id + " User token: " + req.query.token);
+                    userModel.getUserByToken(req.exam_id, req.query.token)
+                        .then(function (result) {
+                            if (result) {
+                                req.user = result.user;
+                                req.permission_level = result.permission_level;
+                                req.authenticated = true;
+                            } else {
+                                req.permission_level = 0;
+                            }
+                            next();
+                        })
+                        .catch(function (error) {
+                            console.error("Error happened during SQL query.\n", error)
+                            next(new Error("SQL lookup Fail"));
+                        });
+                } else {
+                    next();
+                }
             } else {
-                req.permission_level = 0;
+                res.status(404).json({error: "Exam doesn't exist"});
             }
-            next();
-        })
-        .catch(function(error) {
-            console.error("Error happened during SQL query.\n", error)
-            next(new Error("SQL lookup Fail"));
         });
-    next();
 });
 
-router.get('/', permission(3), function(req, res) {
+router.get('/', permission(roles.admin), function(req, res) {
     examModel.getAllExams()
         .then(function(result) {
             res.json(result)
@@ -44,7 +54,7 @@ router.get('/', permission(3), function(req, res) {
 });
 
 // Create a new exam
-router.post('/', permission(0), jsonParser, function (req, res) {
+router.post('/', permission(roles.guest), jsonParser, function (req, res) {
     if (req.body) {
         console.log(req.body);
         if ('short_name' in req.body) {
@@ -62,16 +72,17 @@ router.post('/', permission(0), jsonParser, function (req, res) {
 
 
 
-router.get('/:exam_id', permission(1), function(req, res) {
+router.get('/:exam_id', permission(roles.member), function(req, res) {
 
     // TODO: Do the batch function thing
 
     var exam_id = req.exam_id;
+    console.log("Getting answers from exam_" + exam_id);
 
     var queries = [
         examModel.getExam(exam_id),
-        questionModel.getAllQuestions(exam_id, {visable: true}),
-        answerModel.getAllAnswers(exam_id, {visable: true}),
+        questionModel.getAllQuestions(exam_id, {visible: true}),
+        answerModel.getAllAnswers(exam_id, {visible: true}),
         commentModel.getAllComments(exam_id)
     ];
 
@@ -82,33 +93,40 @@ router.get('/:exam_id', permission(1), function(req, res) {
 
             // Construct lookup table for questions indexed by id
             var question_lookup = {};
-            for (question in questions) {
-                question_lookup[question.id] = question;
+            console.log("All Questions: " + JSON.stringify(questions));
+            for (var i = 0; i < questions.length; i++) {
+                question_lookup[questions[i].id] = questions[i];
             }
             // Add empty containers for answers and comments
-            for (question in questions) {
-                question.answers = [];
-                question.comments = [];
+            for (var index = 0; index < questions.length; index++) {
+                questions[index].answers = [];
+                questions[index].comments = [];
             }
 
             var answers = results[2];
+            console.log("Answers: " + JSON.stringify(answers));
             // Add answers to respective questions
-            for (answer in answers) {
-                question_lookup[answer.parent_question].answers.add(answer);
+            for (var i = 0; i < answers.length; i++) {
+                console.log("Pushing answer: " + JSON.stringify(answers[i]));
+                question_lookup[answers[i].parent_question].answers.push(answers[i]);
             }
 
             // Construct answer lookup (for comments)
             answer_lookup = {};
-            for (answer in answers) {
-                answer_lookup[answer.id] = answer;
+
+            for (var i = 0; i < answers.length; i++) {
+                answer_lookup[answers[i].id] = answers[i];
+                answers[i].comments = [];
             }
 
             var comments = results[3];
-            for (comment in comments) {
-                if (comment.parent_question) {
-                    question_lookup[comment.parent_question].comments.add(comment);
+            console.log("Comments: " + JSON.stringify(comments));
+            for (var i = 0; i < comments.length; i++) {
+                if (comments[i].parent_question === null) {
+                    answer_lookup[comments[i].parent_answer].comments.push(comments[i]);
+
                 } else {
-                    answer_lookup[comment.parent_answer].comments.add(comment);
+                    question_lookup[comments[i].parent_question].comments.push(comments[i]);
                 }
             }
 
@@ -124,7 +142,7 @@ router.get('/:exam_id', permission(1), function(req, res) {
         });
 });
 
-router.delete('/:exam_id', permission(2), function (req, res) {
+router.delete('/:exam_id', permission(roles.owner), function (req, res) {
     examModel.deleteExam(req.params.id)
         .then(function (result) {
             res.status(204).send();

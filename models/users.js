@@ -35,3 +35,11 @@ exports.createUser = function(exam_id, name_noun, name_color, uuid, perm_level) 
         name_color: name_color
     });
 };
+
+exports.roles = Object.freeze({
+    guest:      0,
+    member:     1,
+    moderator:  2,
+    owner:      3,
+    admin:      4
+});

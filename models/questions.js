@@ -26,3 +26,7 @@ exports.createQuestion = function(exam_id, number, body_text, author, parent_que
         parent_question: parent_question
         });
 };
+
+exports.getQuestion = function(exam_id, question_id) {
+    return db.oneOrNone("SELECT * FROM ${exam_id^}.questions WHERE ID=${question_id}", {exam_id: 'exam_' + exam_id, question_id: question_id})
+};
